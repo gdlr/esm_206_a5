@@ -15,6 +15,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(janitor)
+library(kableExtra)
 ```
 
 ```{r read and clean data}
@@ -51,11 +52,35 @@ ggplot(data = sal_counts, aes(x = year, y = n, color = section)) +
 ```{r salamander counts}
 # Filter out Isolated Pool (IP) observations, select for only year 2017, count data
 
-sal_channel_counts <- sal_data %>% 
-  filter(unittype == c("P", "C", "SC", "S", "R")) %>% 
+channel_counts <- sal_data %>% 
+  filter(unittype == c("P", "C", "SC", "S", "R")) %>%
   filter(year == "2017") %>%
   group_by(section, unittype) %>% 
   count()
+
+# Note that there are only counts recorded for C, SC, and P stream locations
+
+# Make a contingency table
+
+channel_table <- channel_counts %>%
+  pivot_wider(names_from = section, values_from = n)
+
+# Then adorn with proportions
+
+channel_prop <- channel_table %>% 
+  adorn_percentages(denominator = "row") %>% 
+  adorn_pct_formatting(digits = 2) %>% 
+  adorn_ns(position = "front")
+
+# Then make a table
+
+kable(channel_prop, 
+      col.names = c(" ", "Clear Cut", "Old Growth")) %>%
+  kable_styling(bootstrap_options = c("striped"))
+
+```
+
+```{r chi-squared for position}
 
 
 

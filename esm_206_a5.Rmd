@@ -1,0 +1,63 @@
+---
+title: "Lab 5"
+author: "Gabriel De La Rosa"
+date: "11/27/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r packages}
+# Load packages
+
+library(tidyverse)
+library(janitor)
+```
+
+```{r read and clean data}
+# Read in data...only keep salamander (DITE species) and year, section, unittype(where in the channel salamanders are found) and weight columns.
+
+sal_data <- read_csv("mack_creek_vertebrates.csv") %>%
+  clean_names() %>% 
+  filter(species == "DITE") %>% 
+  select(c(year, section, unittype, weight))
+  
+```
+
+```{r counts for section}
+sal_counts <- sal_data %>%
+  group_by(year, section) %>% 
+  count()
+
+ggplot(data = sal_counts, aes(x = year, y = n, color = section)) +
+  geom_line() +
+  
+  geom_ribbon(aes(ymin = 0, ymax = n, fill = section),
+              alpha = 0.6) +
+  
+  theme_bw() +
+  
+  scale_x_continuous(expand = c(0,0)) +
+  
+  scale_y_continuous(expand = c(0,0), 
+                     limits = c())
+
+```
+
+
+```{r salamander counts}
+# Filter out Isolated Pool (IP) observations, select for only year 2017, count data
+
+sal_channel_counts <- sal_data %>% 
+  filter(unittype == c("P", "C", "SC", "S", "R")) %>% 
+  filter(year == "2017") %>%
+  group_by(section, unittype) %>% 
+  count()
+
+
+
+```
+

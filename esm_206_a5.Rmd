@@ -29,9 +29,14 @@ sal_data <- read_csv("mack_creek_vertebrates.csv") %>%
 ```
 
 ```{r counts for section}
+
+# Count salamander observations per year
+
 sal_counts <- sal_data %>%
   group_by(year, section) %>% 
   count()
+
+# Plot these data...
 
 ggplot(data = sal_counts, aes(x = year, y = n, color = section)) +
   geom_line() +
@@ -63,7 +68,8 @@ channel_counts <- sal_data %>%
 # Make a contingency table
 
 channel_table <- channel_counts %>%
-  pivot_wider(names_from = section, values_from = n)
+  pivot_wider(names_from = section, values_from = n) %>% 
+  column_to_rownames("unittype")
 
 # Then adorn with proportions
 
@@ -75,12 +81,71 @@ channel_prop <- channel_table %>%
 # Then make a table
 
 kable(channel_prop, 
-      col.names = c(" ", "Clear Cut", "Old Growth")) %>%
+      col.names = c("Clear Cut", "Old Growth"),
+      row.names = c("Channel", "Pool", "Side Channel")) %>% 
   kable_styling(bootstrap_options = c("striped"))
 
 ```
 
-```{r chi-squared for position}
+```{r chi-squared for channel position}
+
+channel_chi <- chisq.test(channel_table)
+
+```
+
+
+```{r Salamander weights in forest section}
+# Make new df for weights in 2017
+
+sal_weights <- sal_data %>% 
+  filter(year == "2017") %>% 
+  select(-unittype)
+
+# Then look at these data...
+
+ggplot(data = sal_weights, aes(x = weight)) +
+  geom_histogram() +
+  facet_wrap("section")
+
+# A bit skewed. Let's look at a QQ plot...
+
+ggplot(data = sal_weights, aes(sample = weight)) +
+  geom_qq() +
+  facet_wrap("section")
+
+# Pretty skewed. But, the prompt asks to compare means...so...
+# Split CC and OG sections into separate data frames...
+
+og_weight <- sal_weights %>% 
+  filter(section == "OG")
+
+cc_weight <- sal_weights %>% 
+  filter(section == "CC")
+
+# Look at a few summary statistics...
+
+og_summary <- og_weight %>% 
+  summarize(mean = mean(og_weight$weight, na.rm = TRUE)) %>% 
+  mutate(sd = sd(og_weight$weight, na.rm = TRUE)) %>% 
+  mutate(median = median(og_weight$weight, na.rm = TRUE))
+
+cc_summary <- cc_weight %>% 
+  summarize(mean = mean(cc_weight$weight, na.rm = TRUE)) %>% 
+  mutate(sd = sd(cc_weight$weight, na.rm = TRUE)) %>% 
+  mutate(median = median(cc_weight$weight, na.rm = TRUE))
+
+# Then, do a parametric test on the means
+
+section_wt_t <- t.test(og_weight$weight, cc_weight$weight)
+
+section_wt_t
+
+```
+
+```{r weights by channel position}
+
+
+
 
 
 

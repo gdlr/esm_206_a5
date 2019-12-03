@@ -1,5 +1,5 @@
 ---
-title: "Lab 5"
+title: "Impacts of clear cutting on Pacific Giant Salamander size and abundance in the Andrews Experimental Forest"
 author: "Gabriel De La Rosa"
 date: "11/27/2019"
 output: html_document
@@ -27,7 +27,7 @@ library(car)
 
 sal_data <- read_csv("mack_creek_vertebrates.csv") %>%
   clean_names() %>% 
-  filter(species == "DITE") %>% 
+  filter(species %in% "DITE") %>% 
   select(c(year, section, unittype, weight))
   
 ```
@@ -55,10 +55,9 @@ sal_counts_graph <- ggplot(data = sal_counts, aes(x = year, y = n, color = secti
   scale_y_continuous(expand = c(0,0), 
                      limits = c(0, 400)) +
     
-  theme(panel.background = element_rect(fill = "cornsilk"),
-        legend.title = NULL) +
+  theme(panel.background = element_rect(fill = "cornsilk")) +
   
-  labs(x = NULL, y = "Salamanders counted", title = "Salamander counts per year in clear cut and old growth forest")
+  labs(x = NULL, y = "Salamanders counted", title = "Salamander counts per year in clear cut and old growth forest", color = "Section")
 
 
 ggsave("sal_counts.png", plot = sal_counts_graph)
@@ -70,8 +69,8 @@ ggsave("sal_counts.png", plot = sal_counts_graph)
 # Filter out Isolated Pool (IP) observations, select for only year 2017, count data
 
 channel_counts <- sal_data %>% 
-  filter(unittype == c("P", "C", "SC", "S", "R")) %>%
-  filter(year == "2017") %>%
+  filter(unittype %in% c("P", "C", "SC", "S", "R")) %>%
+  filter(year %in% "2017") %>%
   group_by(section, unittype) %>% 
   count()
 
@@ -87,6 +86,9 @@ channel_table <- channel_counts %>%
 
 channel_prop <- channel_table %>% 
   rownames_to_column("unittype") %>% 
+  mutate(unittype = replace(unittype, unittype == "C", "Channel")) %>% 
+  mutate(unittype = replace(unittype, unittype == "SC", "Side Channel")) %>% 
+  mutate(unittype = replace(unittype, unittype == "P", "Pool")) %>% 
   adorn_percentages(denominator = "row") %>% 
   adorn_pct_formatting(digits = 2) %>% 
   adorn_ns(position = "front")
@@ -115,8 +117,16 @@ channel_chi
 # Make new df for weights in 2017
 
 sal_weights <- sal_data %>% 
-  filter(year == "2017") %>% 
-  select(-unittype) 
+  filter(year %in% "2017") %>% 
+  select(-unittype) %>% 
+  drop_na(weight)
+
+section_means <- sal_weights %>% 
+  group_by(section) %>% 
+  summarize(mean = mean(weight)) %>% 
+  pull(mean)
+
+# CC then OG order in this vector ^^
 
 # Then look at these data...
 
@@ -152,10 +162,10 @@ ggplot(data = sal_weights, aes(sample = weight)) +
 # Split CC and OG sections into separate data frames...
 
 og_weight <- sal_weights %>% 
-  filter(section == "OG")
+  filter(section %in% "OG")
 
 cc_weight <- sal_weights %>% 
-  filter(section == "CC")
+  filter(section %in% "CC")
 
 # Look at a few summary statistics...
 
@@ -182,9 +192,10 @@ section_wt_t
 # First, make a df for just 2017 weights
 
 chan_wt <- sal_data %>% 
-  filter(year == "2017") %>% 
+  filter(year %in% "2017") %>% 
   select(-section) %>% 
-  filter(unittype == c("C", "P", "SC"))
+  filter(unittype %in% c("C", "P", "SC")) %>% 
+  drop_na(weight)
 
 chan_wt_summary <- chan_wt %>% 
   group_by(unittype) %>% 
@@ -192,15 +203,25 @@ chan_wt_summary <- chan_wt %>%
             sd = sd(weight),
             se = sqrt(sd))
 
+chan_means <- chan_wt %>% 
+  group_by(unittype) %>% 
+  summarize(mean = mean(weight)) %>% 
+  pull(mean)
+  
+## C, P, SC in order ^^
+
 
 # Then, graph these data...
 
-sal_weights_graph <- ggplot() +
+sal_weights_graph <- 
+  
+  ggplot() +
   geom_beeswarm(data = chan_wt, 
                 aes(x = unittype, y = weight),
                 color = "grey60",
                 alpha = 0.8,
-                cex = 1.5
+                cex = 1,
+                size = .5
                 ) +
   
   geom_errorbar(data = chan_wt_summary,
@@ -229,7 +250,9 @@ sal_weights_graph <- ggplot() +
   scale_y_continuous(expand = c(0,0),
                      limits = c(0, 70)) +
   
-  scale_x_discrete(labels = c("Channel", "Pool", "Side Channel")) +
+  scale_x_discrete(labels = c("Channel", "Pool", "Side Channel"),
+                   expand = c(.35, 0)
+                   ) +
   
   labs(x = "Habitat type", y = "Weight (g)", title = "Giant Salamander weights in different stream locations")
 
@@ -261,15 +284,17 @@ weight_tukey_tidy <- broom::tidy(TukeyHSD(weight_aov))
 
 ## Introduction
 
+Pacific Giant Salamander (*Dicamptodon tenebrosus*) shares habitat with significant logging operations in the Pacific Northwest (Dudaniec & Richardson, 2012). Logging effects on amphibian populations affect different amphibian life stages in different ways. Larval and oviposition stages are positively affected by logging, whereas juvenile and adult stages are negatively affected (Semlitsch et al. 2009). Logging disturbance has been shown to negatively affect Pacific Giant Salamander recovery in certain areas (Ferguson, 2000). In this report, we explore how logging affects Pacific Giant Salamander abundance and size in the Andrews Experimental Forest in Oregon. Salamander size and abundance was compared between clear cut and old growth forest plots. We find salamander size and abundance is better predicted by stream characteristics than forest type. Logging operations that maintain certain preferred stream types can likely sustain Pacific Giant Salamander populations even when clear cutting.
 
+![*Pacific Giant Salamander. Photo: John Clare*](giant_sal.jpeg)
 
 ## Data and methods
 
 Salamander weight measurements and abundance data were collected and provided by the [Andrews Experimental Forest Long Term Environmental Research Program.](https://portal.lternet.edu/nis/mapbrowse?packageid=knb-lter-and.4027.12) Vertibrate stream surveys were conducted yearly via 50m electroshocking passes in two standard 150m reaches of forest: one old growth, and one clear cut (ca. 1963). 50m pass sections were separated with nets during sampling. Captured vertibrates from these passes were weighed and counted. Salamander location was recorded as cascade, riffle, isolated pool, pool, rapid, step, or side channel.
 
-Salamander counts were compared for forest type and stream location using a $\chi$^2^ test ($\alpha$ = 0.5 throughout). Mean weights were compared between forest types using a two-sample t-test. Mean weights were compared between stream types using a one-way ANOVA. Assumptions of equal variance for weight samples between different stream types were confirmed using Levene's test. 
+Salamander counts were compared for forest type and stream location using a $\chi$^2^ test ($\alpha$ = 0.5 throughout). Mean weights were compared between forest types using a two-sample t-test. Mean weights were compared between stream types using a one-way ANOVA and post-hoc Tukey HSD test. Assumptions of equal variance for weight samples between different stream types were confirmed using Levene's test. 
 
-MAP
+![*Andrews experimental forest study site map. Forest sections are along the Mack Creek river. Source: Dana Warren*](site_map.png)
 
 ## Results
 
@@ -287,18 +312,18 @@ Salamander counts in old growth and clear cut sections of forest were compared o
 
 ### C. 
 
-Salamanders were most often found in channels (n = 89), followed by side channels (n = 33), and then pools (n = 17). Forest type had no significant effect on where salamanders reside in streams ($\chi$^2^ (`r round(channel_chi$parameter, 2)`) = `r round(channel_chi$statistic, 2)`, *p* = `r round(channel_chi$p.value, 2)`). 
+Salamanders were most often found in channels (n = 448), followed by side channels (n = 164), and then pools (n = 76). Forest type had no significant effect on where salamanders reside in streams ($\chi$^2^ (`r round(channel_chi$parameter, 2)`) = `r round(channel_chi$statistic, 2)`, *p* = `r round(channel_chi$p.value, 2)`).
 
 ### D. 
 
-Forest type also had no significant effect on salamander weights (t(`r round(section_wt_t$parameter, 2)`) = `r round(section_wt_t$statistic, 2)`, *p* = `r round(section_wt_t$p.value, 2)` However, on average, salamanders found in clear cut sections of forest weighed over a gram more (mean = 7.8g) than salamanders in old growth sections (mean = 6.7g). Data was widely spread in both forest types (clear cut sd = 9.0g, old growth sd = 9.9g), reducing robustness of the parametric test used. This is likely due to strong positive skew in weight data, where just a few salamanders weighed significantly more than the mean (Figure 2.).
+Forest type also had no significant effect on salamander weights (t(`r round(section_wt_t$parameter, 2)`) = `r round(section_wt_t$statistic, 2)`, *p* = `r round(section_wt_t$p.value, 2)` However, on average, salamanders found in clear cut sections of forest weighed over a gram more (mean = `r round(section_means[1], 2)`g) than salamanders in old growth sections (mean = `r round(section_means[2], 2)`g). Data was widely spread in both forest types (clear cut sd = 9.9g, old growth sd = 9.0g), reducing robustness of the parametric test used. This is likely due to strong positive skew in weight data, where just a few salamanders weighed significantly more than the mean (Figure 2.).
 
 ![**Figure 2.** *Histogram of weight measurements in 2017 for both clear cut (CC) and old growth (OG) forest types. Bin width = 30g.*](weight_dist.png)
 
 
 ### E.
 
-The heaviest salamanders were all found in stream channels (Fig. 3), though stream location did not have a significant effect on salamander size (one-way ANOVA(`r weight_list[1]`, `r weight_list[2]`) = `r round(weight_list[7], 2)`, *p* = `r round(weight_list[9], 2)`). Salamanders found in channels were almost twice as heavy (mean = 8.2g) as those found in side channels (mean = 4.8g). 
+The heaviest salamanders were all found in stream channels (Fig. 3), and stream position has a significant effect on salamander size (one-way ANOVA(`r weight_list[1]`, `r weight_list[2]`) = `r round(weight_list[7], 2)`, *p* = `r round(weight_list[9], 2)`). A post-hoc Tukey test shows that salamander mean weights in side channels (mean = `r round(chan_means[3], 2)`g) were significantly different from those in pools (mean `r round(chan_means[2], 2)`g) (*p* < 0.05). Salamanders found in channels were heavier (mean = `r round(chan_means[1], 2)`g) as those found in side channels (mean = `r round(chan_means[3], 2)`g) on average, though the difference in means was not significant (*p* > 0.05). 
 
 Weight measurements for salamanders found in channels are positively skewed. Comparing medians between groups, rather than means, may better describe differences between groups, as medians are less affected by skew than means. This would mainly effect the mean of salamanders found in channels, which have a few uncharacteristically heavy individuals pulling the mean heavier.
 
@@ -306,7 +331,21 @@ Weight measurements for salamanders found in channels are positively skewed. Com
 
 ## Summary
 
+* Salamander abundance is better predicted by stream location than forest type (Figure 3.).
+* Historically, old growth forest had more salamanders than clear cut forest. However, as of 2015, more salamanders were observed in clear cut forests (Figure 1.).
+* Most salamanders, and most heavy salamanders, are found in channels. This suggests that channels are crucial salamander habitat (Figure 3.).
+* Salamander populations in Mack Creek are mainly comprised of relatively lightweight individuals, suggesting salamanders may have short lifespans (Figure 2.). 
+
+
+
 ## References
 
+Dudaniec and Richardson—HABITAT ASSOCIATIONS OF THE COASTAL GIANT SALAMAND.pdf. (n.d.). Retrieved from http://herpconbio.org/Volume_7/Issue_1/Dudaniec_Richardson_2012.pdf Dudaniec, R. Y., & Richardson, J. S. (n.d.). HABITAT ASSOCIATIONS OF THE     COASTAL GIANT SALAMANDER (DICAMPTODON TENEBROSUS) AT ITS NORTHERN RANGE LIMIT. Herpetological Conservation and Biology, 15.
+
+Ferguson, H. (2000). Larval colonisation and recruitment in the Pacific giant salamander ( Dicamptodon tenebrosus ) in British Columbia. Canadian Journal of Zoology-Revue Canadienne De Zoologie - CAN J ZOOL, 78, 1238–1242. https://doi.org/10.1139/cjz-78-7-1238
+
+Gregory S. V. 2016. Aquatic Vertebrate Population Study in Mack Creek, Andrews Experimental Forest, 1987 to present. Environmental Data Initiative. https://doi.org/10.6073/pasta/5de64af9c11579266ef20da2ff32f702. Dataset accessed 11/19/2019.
+
+Semlitsch, R. D., Todd, B. D., Blomquist, S. M., Calhoun, A. J. K., Gibbons, J. W., Gibbs, J. P., … Rothermel, B. B. (2009). Effects of Timber Harvest on Amphibian Populations: Understanding Mechanisms from Forest Experiments. BioScience, 59(10), 853–862. https://doi.org/10.1525/bio.2009.59.10.7
 
 
